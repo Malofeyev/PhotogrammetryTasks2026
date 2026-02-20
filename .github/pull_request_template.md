@@ -1,5 +1,5 @@
 // Убедитесь что название PR соответствует шаблону:
-// Task01 <Имя> <Фамилия> <ВУЗ>
+// Task01 <ИмяНаРусском> <ФамилияНаРусском> <ВУЗ>
 
 // Проверьте что обе ветки PR - task01 (отправляемая из вашего форкнутого репозитория и та в которую вы отправляете PR)
 
@@ -38,11 +38,12 @@ Running main() from /home/runner/work/PhotogrammetryTasks2023/PhotogrammetryTask
 [ RUN      ] SIFT.MovedTheSameImage
 [ORB_OCV] Points detected: 500 -> 500 (in 0.021269 sec)
 ...
-[       OK ] SIFT.HerzJesu19RotateM40 (7730 ms)
-[----------] 22 tests from SIFT (12918 ms total)
+Final score: 239001
+[       OK ] SIFT.PairMatching (0 ms)
+[----------] 25 tests from SIFT (7264 ms total)
 [----------] Global test environment tear-down
-[==========] 22 tests from 1 test suite ran. (12918 ms total)
-[  PASSED  ] 22 tests.
+[==========] 25 tests from 1 test suite ran. (7264 ms total)
+[  PASSED  ] 25 tests.
 </pre>
 
 </p></details>

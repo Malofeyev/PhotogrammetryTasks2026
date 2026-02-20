@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-14]
+        os: [ubuntu-24.04, macos-14, windows-2022]
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -29,6 +29,11 @@ jobs:
           bash .github/scripts/macos/install_openmp.sh
           bash .github/scripts/macos/install_opencv.sh
 
+      - name: Build and install OpenCV (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .github/scripts/windows/install_opencv.ps1
+
       - name: Configure CMake (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -44,9 +49,36 @@ jobs:
             -DOpenCV_DIR="/opt/opencv-4.11.0/lib/cmake/opencv4" \
             -DOpenMP_ROOT="$(brew --prefix libomp)"
 
-      - name: Build
+      - name: Configure CMake (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $OpenCV_DIR = Get-Content .deps/opencv_dir.txt
+          cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DOpenCV_DIR="$OpenCV_DIR"
+
+      - name: Build (any OS)
         run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
 
-      - name: test_sift
-        working-directory: ${{github.workspace}}
+      - name: Run test_sift (Linux/macOS)
+        if: runner.os != 'Windows'
         run: ./build/test_sift
+
+      - name: Copy OpenCV/gtest DLLs (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $cfg = "${{ env.BUILD_TYPE }}"
+          $exeDir = Join-Path $pwd "build\$cfg"
+
+          # OpenCV DLLs (from your install script output)
+          $ocvBin = Get-Content .deps/opencv_bin.txt
+          Copy-Item "$ocvBin\opencv_world*.dll" $exeDir -Force
+
+          # gtest DLLs (built inside your build tree, location varies -> search)
+          Get-ChildItem -Path build -Recurse -Filter "gtest*.dll" |
+            ForEach-Object { Copy-Item $_.FullName $exeDir -Force }
+
+      - name: Run test_sift (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .\build\${{ env.BUILD_TYPE }}\test_sift.exe

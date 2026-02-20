@@ -16,6 +16,10 @@ else()
 endif()
 
 find_package(OpenCV 4.11.0 REQUIRED)
+# в целом "как выполнить сборку OpenCV и проекта" можно узнать посмотрев на GitHub CI,
+# который выполняет сборку и исполнение на linux/windows/macos
+# описание шагов - в .github/workflows/cmake.yml
+#
 #      Linux:
 # sudo .github/scripts/install_opencv_linux.sh
 # укажите для CMake путь к OpenCV:
@@ -23,7 +27,8 @@ find_package(OpenCV 4.11.0 REQUIRED)
 # там же сразу стоит добавить в дополнению к Debug сборке - сборку с включенными оптимизациями и отладочными символами - RelWithDebInfo
 #
 #     Windows: (но рекомендуется использовать Linux)
-# Скачайте этот скрипт и следуйте инструкции - https://gist.github.com/PolarNick239/18036d942ae4b9aad9f1da756ce6c845#file-buildocv-sh-L10-L33
+# выполните в powershell .github/scripts/windows/install_opencv.ps1
+# альтернативно вы можете следовать инструкции - https://gist.github.com/PolarNick239/18036d942ae4b9aad9f1da756ce6c845#file-buildocv-sh-L10-L33
 #
 #     MacOS: (но рекомендуется использовать Linux, MacOS не тестировался, только на github CI, а инструкция является галлюцинацией LLM)
 # sudo bash .github/scripts/macos/install_openmp.sh

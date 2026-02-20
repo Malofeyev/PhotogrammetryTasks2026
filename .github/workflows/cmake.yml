@@ -75,9 +75,11 @@ jobs:
           $ocvBin = Get-Content .deps/opencv_bin.txt
           Copy-Item "$ocvBin\opencv_world*.dll" $exeDir -Force
 
-          # gtest DLLs (built inside your build tree, location varies -> search)
+          # gtest DLLs (exclude destination dir to avoid copying onto itself)
           Get-ChildItem -Path build -Recurse -Filter "gtest*.dll" |
-            ForEach-Object { Copy-Item $_.FullName $exeDir -Force }
+            Where-Object { $_.DirectoryName -ne $exeDir } |
+            Group-Object Name |
+            ForEach-Object { Copy-Item $_.Group[0].FullName $exeDir -Force }
 
       - name: Run test_sift (Windows)
         if: runner.os == 'Windows'

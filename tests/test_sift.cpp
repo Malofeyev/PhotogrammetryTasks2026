@@ -194,7 +194,8 @@ void evaluateDetection(const cv::Mat& M, double minRecall, cv::Mat img0 = cv::Ma
 #if ENABLE_MY_SIFT_TESTING
                 method_name = "SIFT_MY";
                 log_prefix = "[SIFT_MY] ";
-                phg::SIFT mySIFT(p, 3, "debug/");
+                phg::SIFT mySIFT(p);
+                
                 mySIFT.detectAndCompute(img0, kps0, desc0);
                 mySIFT.detectAndCompute(img1, kps1, desc1);
 #else

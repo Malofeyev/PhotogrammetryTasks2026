@@ -112,7 +112,7 @@ std::vector<phg::SIFT::Octave> phg::buildOctaves(const cv::Mat& img, const phg::
             double sigma_layer = sigma0 * std::pow(2.0, double(i) / s);
             //            // вычтем sigma0 чтобы размыть ровно до нужной суммарной сигмы
             //            TODO sigma_layer = ... (вычитаем как в sigma base);
-            sigma_layer = std::sqrt(sigma_layer * sigma_layer - sigma_nominal * sigma_nominal);
+            sigma_layer = std::sqrt(sigma_layer * sigma_layer - sigma0 * sigma0);
             cv::GaussianBlur(oct.layers[0], oct.layers[i], cv::Size(), sigma_layer, sigma_layer);
         }
 
@@ -123,8 +123,8 @@ std::vector<phg::SIFT::Octave> phg::buildOctaves(const cv::Mat& img, const phg::
 
             // можно использовать и downsample2x_avg(oct.layers[s]), это позволяет потом заапскейлить слои обратно до оригинального разрешения без сдвига
             // но потребуется везде изменить формулу для пересчета ключевых точек: pt_upscaled = (pt_downscaled + 0.5) * 2^o - 0.5
-            base = downsample2x(oct.layers[s]);
-
+            //cv::resize(oct.layers[s], base, cv::Size(oct.layers[s].cols / 2, oct.layers[s].rows / 2), 0, 0);// cv::INTER_NEAREST);
+            base = downsample2x(oct.layers[s]); 
             if (verbose_level)
                 std::cout << "new octave base size: " << base.size().width << std::endl;
         }
@@ -141,9 +141,8 @@ std::vector<phg::SIFT::Octave> phg::buildDoG(const std::vector<phg::SIFT::Octave
         const phg::SIFT::Octave& octave = octaves[o];
         dog[o].layers.resize(octave.layers.size() - 1);
         // TODO каждый слой дога это разница n+1 и n-й гауссианы
-        // чекнуть в opencv этот шаг
         for (size_t d = 0; d < dog[o].layers.size(); d++) {
-            cv::subtract(octave.layers[d + 1], octave.layers[d], dog[o].layers[d], cv::noArray(), CV_16S);
+            dog[o].layers[d] = octave.layers[d + 1] - octave.layers[d];
         }
 
     }
@@ -213,38 +212,31 @@ std::vector<cv::KeyPoint> phg::findScaleSpaceExtrema(const std::vector<phg::SIFT
                         if (v <= val)
                             is_min = false;
                     };
-
-                    // TODO проверить локальный максимум на текущем скейле
-                    std::array<const float*, 3> neighbour_rows = {cp, c, cn};
-                    for (int row_indx = 0; row_indx < 3; row_indx++) {
-                        for (int col_dif = -1; col_dif < 2; col_dif++) {
-                            if (col_dif != 0 || row_indx != 1) {
-                                check(neighbour_rows[row_indx][x + col_dif]);
+                    
+                    auto check_scale = [&](const float* p, const float* c, const float* n, bool is_cur) {
+                        std::array<const float*, 3> neighbour_rows = {p, c, n};
+                        for (int row_indx = 0; row_indx < 3; row_indx++) {
+                            for (int col_dif = -1; col_dif < 2; col_dif++) {
+                                if (!is_cur || col_dif != 0 || row_indx != 1) {
+                                    check(neighbour_rows[row_indx][x + col_dif]);
+                                }
                             }
                         }
-                    }
+                    };
+
+                    // TODO проверить локальный максимум на текущем скейле
+                    check_scale(cp, c, cn, true);
                     if (!is_max && !is_min)
                         continue;
-
                     // TODO проверить локальный максимум на предыдущем скейле
-                    neighbour_rows = {pp, p, pn};
-                    for (int row_indx = 0; row_indx < 3; row_indx++) {
-                        for (int col_dif = -1; col_dif < 2; col_dif++) {
-                            check(neighbour_rows[row_indx][x + col_dif]);
-                        }
-                    }
+                    check_scale(pp, p, pn, false);
+                    if (!is_max && !is_min)
+                        continue;
+                    // TODO проверить локальный максимум на следующем скейле
+                    check_scale(np, n, nn, false);
                     if (!is_max && !is_min)
                         continue;
 
-                    // TODO проверить локальный максимум на следующем скейле
-                    neighbour_rows = {np, n, nn};
-                    for (int row_indx = 0; row_indx < 3; row_indx++) {
-                        for (int col_dif = -1; col_dif < 2; col_dif++) {
-                            check(neighbour_rows[row_indx][x + col_dif]);
-                        }
-                    }
-                    if (!is_max && !is_min)
-                        continue;
 
                     int xi = x, yi = y, li = layer;
 
@@ -419,7 +411,7 @@ std::vector<cv::KeyPoint> phg::computeOrientations(const std::vector<cv::KeyPoin
                 if (angle_deg < 0.f) angle_deg += 360.f;
                 // TODO
                 // гауссово взвешивание голоса точки с затуханием к краям
-                float weight = std::exp(-(px * px + py * py) / (2.f * sigma_win * sigma_win));
+                float weight = std::exp(-(dx * dx + dy * dy) / (2.f * sigma_win * sigma_win));
                 if (!params.enable_orientation_gaussian_weighting) {
                     weight = 1.f;
                 }
@@ -438,8 +430,8 @@ std::vector<cv::KeyPoint> phg::computeOrientations(const std::vector<cv::KeyPoin
                 }
                 
                 // TODO
-                histogram[bin0] += weight * mag;
-                histogram[bin1] += weight * mag;
+                histogram[bin0] += (1 - frac) * weight * mag;
+                histogram[bin1] += frac * weight * mag;
             }
         }
 
@@ -478,7 +470,7 @@ std::vector<cv::KeyPoint> phg::computeOrientations(const std::vector<cv::KeyPoin
                 //  f(1) + f(-1) = 2a + 2c -> a = (left + right - 2 * center) / 2
                 //  f(1) - f(-1) = 2b -> b = (right - left) / 2
                 // TODO
-                float offset = (left - right) / (left + right - 2 * center);
+                float offset = (left - right) / (left + right - 2 * center) / 2;
                 if (!params.enable_orientation_subpixel_localization) {
                     offset = 0.f;
                 }
@@ -619,8 +611,7 @@ std::pair<cv::Mat, std::vector<cv::KeyPoint>> phg::computeDescriptors(const std:
                     float fx = bin_x - ix0;
                     float fy = bin_y - iy0;
                     float fo = bin_o - io0;
-//                  https://gist.github.com/lxc-xx/7088609#file-sift-cpp-L610
-//                  https://github.com/robwhess/opensift/blob/master/src/sift.c#L1135
+
                     for (int diy = 0; diy <= 1; diy++) {
                         int iy = iy0 + diy;
                         if (iy < 0 || iy >= n_spatial_bins)
@@ -639,7 +630,7 @@ std::pair<cv::Mat, std::vector<cv::KeyPoint>> phg::computeDescriptors(const std:
                                     io += n_orient_bins;
                                 float wo = (dio == 0) ? (1.f - fo) : fo;
                                 // TODO
-                                int idx = io;
+                                int idx = (iy * n_spatial_bins + ix) * n_orient_bins + io;
                                 desc[idx] += weighted_mag * wy * wx * wo;
                             }
                         }

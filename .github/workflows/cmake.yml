@@ -53,10 +53,15 @@ jobs:
       - name: Configure CMake (macOS)
         if: runner.os == 'macOS'
         run: |
+          OMP_PREFIX="$(brew --prefix libomp)"
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
             -DOpenCV_DIR="/opt/opencv-4.11.0/lib/cmake/opencv4" \
-            -DOpenMP_ROOT="$(brew --prefix libomp)" \
+            -DOpenMP_C_FLAGS="-Xclang -fopenmp -I${OMP_PREFIX}/include" \
+            -DOpenMP_CXX_FLAGS="-Xclang -fopenmp -I${OMP_PREFIX}/include" \
+            -DOpenMP_C_LIB_NAMES="omp" \
+            -DOpenMP_CXX_LIB_NAMES="omp" \
+            -DOpenMP_omp_LIBRARY="${OMP_PREFIX}/lib/libomp.dylib" \
             -DCMAKE_PREFIX_PATH="/opt/ceres-solver220"
 
       - name: Configure CMake (Windows)
